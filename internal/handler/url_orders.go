@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/bissquit/gophermart/internal/auth/jwt"
 	"github.com/bissquit/gophermart/internal/luhn"
 	"github.com/bissquit/gophermart/internal/repository"
 )
@@ -36,8 +37,9 @@ func (h *Handlers) CreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := strconv.Atoi(string(body)); err != nil {
+	if _, err := strconv.Atoi(orderNumber); err != nil {
 		http.Error(w, http.StatusText(http.StatusUnprocessableEntity), http.StatusUnprocessableEntity)
+		return
 	}
 
 	if !luhn.Valid(orderNumber) {
@@ -45,9 +47,9 @@ func (h *Handlers) CreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID := r.Context().Value("user_id").(string)
+	userID := r.Context().Value(jwt.UserIDKey).(string)
 
-	err = h.storage.CreateOrder(userID, string(body))
+	err = h.storage.CreateOrder(userID, orderNumber)
 	if err == nil {
 		w.WriteHeader(http.StatusAccepted)
 		return
@@ -63,5 +65,6 @@ func (h *Handlers) CreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.logger.Error("create order error", "err", err)
 	http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 }

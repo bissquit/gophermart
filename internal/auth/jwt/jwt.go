@@ -10,6 +10,13 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+type contextKey string
+
+const (
+	UserIDKey contextKey = "user_id"
+	LoginKey  contextKey = "login"
+)
+
 type Claims struct {
 	UserID string `json:"user_id"`
 	Login  string `json:"login"`
@@ -72,8 +79,8 @@ func JWT(secret []byte) func(http.Handler) http.Handler {
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), "login", claims.Login)
-			ctx = context.WithValue(ctx, "user_id", claims.UserID)
+			ctx := context.WithValue(r.Context(), LoginKey, claims.Login)
+			ctx = context.WithValue(ctx, UserIDKey, claims.UserID)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
