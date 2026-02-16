@@ -1,12 +1,14 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"mime"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/bissquit/gophermart/internal/auth/jwt"
 	"github.com/bissquit/gophermart/internal/luhn"
@@ -67,4 +69,44 @@ func (h *Handlers) CreateOrder(w http.ResponseWriter, r *http.Request) {
 
 	h.logger.Error("create order error", "err", err)
 	http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+}
+
+type order struct {
+	OrderNumber string    `json:"number"`
+	Status      string    `json:"status"`
+	Accrual     *int      `json:"accrual,omitempty"`
+	UploadedAt  time.Time `json:"uploaded_at"`
+}
+
+func (h *Handlers) GetOrdersByUser(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(jwt.UserIDKey).(string)
+
+	var repoOrders []repository.Order
+	repoOrders, err := h.storage.GetOrdersByUser(userID)
+	if err != nil {
+		h.logger.Error("get orders by user error", "err", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	if len(repoOrders) == 0 {
+		w.WriteHeader(http.StatusNoContent) // 204
+		return
+	}
+
+	userOrders := make([]order, 0, len(repoOrders))
+	for _, repoOrder := range repoOrders {
+		userOrder := order{
+			OrderNumber: repoOrder.OrderNumber,
+			Status:      repoOrder.Status,
+			Accrual:     repoOrder.Accrual,
+			UploadedAt:  repoOrder.UploadedAt,
+		}
+		userOrders = append(userOrders, userOrder)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(userOrders); err != nil {
+		h.logger.Error("error encoding orders", "err", err)
+	}
 }

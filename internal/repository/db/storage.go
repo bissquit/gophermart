@@ -105,3 +105,44 @@ func (s *PGStorage) CreateOrder(userID, orderNumber string) error {
 	s.logger.Error("create order error", "err", err)
 	return err
 }
+
+func (s *PGStorage) GetOrdersByUser(UserID string) (orders []repository.Order, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	rows, err := s.pool.Query(ctx, `
+		SELECT id, user_id, order_number, status, accrual, uploaded_at 
+		FROM orders 
+		WHERE user_id = $1 
+		ORDER BY uploaded_at DESC
+	`, UserID)
+	if err != nil {
+		s.logger.Error("query orders error", "err", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var order repository.Order
+		err := rows.Scan(
+			&order.ID,
+			&order.UserID,
+			&order.OrderNumber,
+			&order.Status,
+			&order.Accrual,
+			&order.UploadedAt,
+		)
+		if err != nil {
+			s.logger.Error("scan order error", "err", err)
+			return nil, err
+		}
+		orders = append(orders, order)
+	}
+
+	if err := rows.Err(); err != nil {
+		s.logger.Error("rows iteration error", "err", err)
+		return nil, err
+	}
+
+	return orders, nil
+}

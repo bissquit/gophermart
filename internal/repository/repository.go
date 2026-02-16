@@ -23,7 +23,7 @@ type Order struct {
 	UserID      string
 	OrderNumber string
 	Status      string
-	Accrual     string
+	Accrual     *int // *int may be nil
 	UploadedAt  time.Time
 }
 
@@ -34,6 +34,6 @@ type GophermartRepository interface {
 
 	// orders
 	CreateOrder(UserID, orderNumber string) error
-	//GetOrder(orderNumber string) (order *Order, err error)
-	//GetOrdersByUser(login string) (orders []*Order, err error)
+	//GetOrder(orderNumber string) (order Order, err error)
+	GetOrdersByUser(UserID string) (orders []Order, err error)
 }
