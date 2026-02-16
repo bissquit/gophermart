@@ -1,6 +1,6 @@
 module github.com/bissquit/gophermart
 
-go 1.25.6
+go 1.24.13
 
 require (
 	github.com/bissquit/url-shortener v0.0.0-20260204200754-5e5b206b29fb
