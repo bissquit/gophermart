@@ -1,0 +1,160 @@
+### Ping database
+GET http://localhost:8080/ping
+
+### Register new user - success (200)
+POST http://localhost:8080/api/user/register
+Content-Type: application/json
+
+{
+  "login": "testuser",
+  "password": "password123"
+}
+
+> {%
+    client.test("Register success", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.hasOwnProperty("token"), "No token in response");
+    });
+    client.global.set("auth_token", response.body.token);
+%}
+
+### Register same user again - conflict (409)
+POST http://localhost:8080/api/user/register
+Content-Type: application/json
+
+{
+  "login": "testuser",
+  "password": "password123"
+}
+
+> {%
+    client.test("Register conflict", function() {
+        client.assert(response.status === 409, "Expected 409 Conflict");
+    });
+%}
+
+### Register with empty login - bad request (400)
+POST http://localhost:8080/api/user/register
+Content-Type: application/json
+
+{
+  "login": "",
+  "password": "password123"
+}
+
+> {%
+    client.test("Empty login", function() {
+        client.assert(response.status === 400, "Expected 400 Bad Request");
+    });
+%}
+
+### Register with empty password - bad request (400)
+POST http://localhost:8080/api/user/register
+Content-Type: application/json
+
+{
+  "login": "testuser2",
+  "password": ""
+}
+
+### Register with wrong Content-Type - bad request (400)
+POST http://localhost:8080/api/user/register
+Content-Type: text/plain
+
+{
+  "login": "testuser3",
+  "password": "password123"
+}
+
+### Register with invalid JSON - bad request (400)
+POST http://localhost:8080/api/user/register
+Content-Type: application/json
+
+{
+  "login": "testuser3",
+  "password": "password123"
+
+### Login existing user - success (200)
+POST http://localhost:8080/api/user/login
+Content-Type: application/json
+
+{
+  "login": "testuser",
+  "password": "password123"
+}
+
+> {%
+    client.test("Login success", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.hasOwnProperty("token"), "No token in response");
+    });
+    client.global.set("auth_token", response.body.token);
+%}
+
+### Login with wrong password - unauthorized (401)
+POST http://localhost:8080/api/user/login
+Content-Type: application/json
+
+{
+  "login": "testuser",
+  "password": "wrongpassword"
+}
+
+> {%
+    client.test("Wrong password", function() {
+        client.assert(response.status === 401, "Expected 401 Unauthorized");
+    });
+%}
+
+### Login non-existent user - unauthorized (401)
+POST http://localhost:8080/api/user/login
+Content-Type: application/json
+
+{
+  "login": "nonexistent",
+  "password": "password123"
+}
+
+> {%
+    client.test("User not found", function() {
+        client.assert(response.status === 401, "Expected 401 Unauthorized");
+    });
+%}
+
+### Login with empty fields - bad request (400)
+POST http://localhost:8080/api/user/login
+Content-Type: application/json
+
+{
+  "login": "",
+  "password": ""
+}
+
+### Access protected route WITH token - success (200)
+GET http://localhost:8080/
+Authorization: Bearer {{auth_token}}
+
+> {%
+    client.test("Protected route with token", function() {
+        client.assert(response.status === 200, "Expected 200 OK");
+    });
+%}
+
+### Access protected route WITHOUT token - unauthorized (401)
+GET http://localhost:8080/
+
+> {%
+    client.test("Protected route without token", function() {
+        client.assert(response.status === 401, "Expected 401 Unauthorized");
+    });
+%}
+
+### Access protected route with INVALID token - unauthorized (401)
+GET http://localhost:8080/
+Authorization: Bearer invalid.token.here
+
+> {%
+    client.test("Protected route with invalid token", function() {
+        client.assert(response.status === 401, "Expected 401 Unauthorized");
+    });
+%}
