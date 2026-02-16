@@ -60,7 +60,7 @@ func (s *Server) setupRoutes() {
 			w.Write([]byte("It works!\n"))
 		})
 		r.Post("/api/user/orders", h.CreateOrder)
-		r.Post("/api/user/orders", h.GetOrdersByUser)
+		r.Get("/api/user/orders", h.GetOrdersByUser)
 	})
 }
 
