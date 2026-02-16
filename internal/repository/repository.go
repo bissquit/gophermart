@@ -6,10 +6,13 @@ import (
 )
 
 var (
-	ErrUserAlreadyExists                = errors.New("user already exists")
-	ErrUserNotFound                     = errors.New("user not found")
+	// users
+	ErrUserAlreadyExists = errors.New("user already exists")
+	ErrUserNotFound      = errors.New("user not found")
+	// orders
 	ErrOrderAlreadyCreatedByUser        = errors.New("order already created by user")
 	ErrOrderAlreadyCreatedByAnotherUser = errors.New("order already created by another user")
+	// balance
 )
 
 type User struct {
@@ -27,13 +30,25 @@ type Order struct {
 	UploadedAt  time.Time
 }
 
+type Withdrawal struct {
+	ID          string
+	UserID      string
+	OrderNumber string
+	Sum         int
+	ProcessedAt *time.Time
+}
+
 type GophermartRepository interface {
 	// auth
 	CreateUser(login, passwordHash string) (userID string, err error)
 	GetUserByLogin(login string) (user User, err error)
 
 	// orders
-	CreateOrder(UserID, orderNumber string) error
-	//GetOrder(orderNumber string) (order Order, err error)
-	GetOrdersByUser(UserID string) (orders []Order, err error)
+	CreateUserOrder(UserID, orderNumber string) error
+	GetUserOrders(UserID string) (orders []Order, err error)
+
+	// balance
+	//GetUserBalance(userID string) (balance int, err error)
+	//WithdrawUserBalance(userID string, amount int) (balance int, err error)
+	//GetUserWithdrawals(userID string)
 }

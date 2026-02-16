@@ -15,7 +15,7 @@ import (
 	"github.com/bissquit/gophermart/internal/repository"
 )
 
-func (h *Handlers) CreateOrder(w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) CreateUserOrder(w http.ResponseWriter, r *http.Request) {
 	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	defer r.Body.Close()
 	if err != nil {
@@ -51,7 +51,7 @@ func (h *Handlers) CreateOrder(w http.ResponseWriter, r *http.Request) {
 
 	userID := r.Context().Value(jwt.UserIDKey).(string)
 
-	err = h.storage.CreateOrder(userID, orderNumber)
+	err = h.storage.CreateUserOrder(userID, orderNumber)
 	if err == nil {
 		w.WriteHeader(http.StatusAccepted)
 		return
@@ -78,11 +78,11 @@ type order struct {
 	UploadedAt  time.Time `json:"uploaded_at"`
 }
 
-func (h *Handlers) GetOrdersByUser(w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) GetUserOrders(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(jwt.UserIDKey).(string)
 
 	var repoOrders []repository.Order
-	repoOrders, err := h.storage.GetOrdersByUser(userID)
+	repoOrders, err := h.storage.GetUserOrders(userID)
 	if err != nil {
 		h.logger.Error("get orders by user error", "err", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)

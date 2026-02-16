@@ -59,8 +59,8 @@ func (s *Server) setupRoutes() {
 			w.Header().Set("Content-Type", "text/plain")
 			w.Write([]byte("It works!\n"))
 		})
-		r.Post("/api/user/orders", h.CreateOrder)
-		r.Get("/api/user/orders", h.GetOrdersByUser)
+		r.Post("/api/user/orders", h.CreateUserOrder)
+		r.Get("/api/user/orders", h.GetUserOrders)
 	})
 }
 

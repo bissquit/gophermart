@@ -69,7 +69,7 @@ func (s *PGStorage) GetUserByLogin(login string) (user repository.User, err erro
 	return repository.User{}, err
 }
 
-func (s *PGStorage) CreateOrder(userID, orderNumber string) error {
+func (s *PGStorage) CreateUserOrder(userID, orderNumber string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -106,7 +106,7 @@ func (s *PGStorage) CreateOrder(userID, orderNumber string) error {
 	return err
 }
 
-func (s *PGStorage) GetOrdersByUser(UserID string) (orders []repository.Order, err error) {
+func (s *PGStorage) GetUserOrders(UserID string) (orders []repository.Order, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
