@@ -34,13 +34,13 @@ type Order struct {
 	UploadedAt  time.Time
 }
 
-//type Withdrawal struct {
-//	ID          string
-//	UserID      string
-//	OrderNumber string
-//	Sum         float64
-//	ProcessedAt time.Time
-//}
+type Withdrawal struct {
+	ID          string
+	UserID      string
+	OrderNumber string
+	Sum         float64
+	ProcessedAt time.Time
+}
 
 type GophermartRepository interface {
 	// auth
@@ -54,5 +54,9 @@ type GophermartRepository interface {
 	// balance
 	GetUserBalance(userID string) (current, withdrawn float64, err error)
 	RequestUserWithdrawal(userID string, orderNumber string, sum float64) error
-	//GetUserWithdrawals(userID string)
+	GetUserWithdrawals(userID string) ([]Withdrawal, error)
+
+	// accrual
+	GetPendingOrders() ([]Order, error)
+	UpdateOrderStatus(orderNumber, status string, accrual *float64) error
 }

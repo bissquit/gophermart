@@ -217,3 +217,103 @@ func (s *PGStorage) RequestUserWithdrawal(userID string, orderNumber string, sum
 	// commit transaction
 	return tx.Commit(ctx)
 }
+
+func (s *PGStorage) GetPendingOrders() ([]repository.Order, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	rows, err := s.pool.Query(ctx, `
+        SELECT id, user_id, order_number, status, accrual, uploaded_at 
+        FROM orders 
+        WHERE status IN ('NEW', 'PROCESSING', 'REGISTERED')
+        ORDER BY uploaded_at ASC
+    `)
+	if err != nil {
+		s.logger.Error("query pending orders error", "err", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var orders []repository.Order
+	for rows.Next() {
+		var order repository.Order
+		err := rows.Scan(
+			&order.ID,
+			&order.UserID,
+			&order.OrderNumber,
+			&order.Status,
+			&order.Accrual,
+			&order.UploadedAt,
+		)
+		if err != nil {
+			s.logger.Error("scan order error", "err", err)
+			return nil, err
+		}
+		orders = append(orders, order)
+	}
+
+	if err := rows.Err(); err != nil {
+		s.logger.Error("rows iteration error", "err", err)
+		return nil, err
+	}
+
+	return orders, nil
+}
+
+func (s *PGStorage) UpdateOrderStatus(orderNumber, status string, accrual *float64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	_, err := s.pool.Exec(ctx,
+		"UPDATE orders SET status = $1, accrual = $2 WHERE order_number = $3",
+		status, accrual, orderNumber,
+	)
+
+	if err != nil {
+		s.logger.Error("update order status error", "err", err, "order", orderNumber)
+		return err
+	}
+
+	return nil
+}
+
+func (s *PGStorage) GetUserWithdrawals(userID string) ([]repository.Withdrawal, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	rows, err := s.pool.Query(ctx, `
+        SELECT id, user_id, order_number, sum, processed_at 
+        FROM withdrawals 
+        WHERE user_id = $1 
+        ORDER BY processed_at DESC
+    `, userID)
+	if err != nil {
+		s.logger.Error("query withdrawals error", "err", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var withdrawals []repository.Withdrawal
+	for rows.Next() {
+		var w repository.Withdrawal
+		err := rows.Scan(
+			&w.ID,
+			&w.UserID,
+			&w.OrderNumber,
+			&w.Sum,
+			&w.ProcessedAt,
+		)
+		if err != nil {
+			s.logger.Error("scan withdrawal error", "err", err)
+			return nil, err
+		}
+		withdrawals = append(withdrawals, w)
+	}
+
+	if err := rows.Err(); err != nil {
+		s.logger.Error("rows iteration error", "err", err)
+		return nil, err
+	}
+
+	return withdrawals, nil
+}

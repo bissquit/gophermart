@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/bissquit/gophermart/internal/auth/jwt"
 	"github.com/bissquit/gophermart/internal/luhn"
@@ -75,4 +76,41 @@ func (h *Handlers) RequestUserWithdrawal(w http.ResponseWriter, r *http.Request)
 	}
 	h.logger.Error("error requesting user withdrawal", "err", err)
 	http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+}
+
+type withdrawal struct {
+	Order       string    `json:"order"`
+	Sum         float64   `json:"sum"`
+	ProcessedAt time.Time `json:"processed_at"`
+}
+
+func (h *Handlers) GetUserWithdrawals(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(jwt.UserIDKey).(string)
+
+	withdrawals, err := h.storage.GetUserWithdrawals(userID)
+	if err != nil {
+		h.logger.Error("get user withdrawals error", "err", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	if len(withdrawals) == 0 {
+		w.WriteHeader(http.StatusNoContent) // 204
+		return
+	}
+
+	// Преобразовать в формат для JSON
+	result := make([]withdrawal, 0, len(withdrawals))
+	for _, wdrl := range withdrawals {
+		result = append(result, withdrawal{
+			Order:       wdrl.OrderNumber,
+			Sum:         wdrl.Sum,
+			ProcessedAt: wdrl.ProcessedAt,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(result); err != nil {
+		h.logger.Error("error encoding withdrawals", "err", err)
+	}
 }

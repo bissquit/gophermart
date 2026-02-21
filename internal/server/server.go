@@ -61,6 +61,8 @@ func (s *Server) setupRoutes() {
 		})
 		r.Post("/api/user/orders", h.CreateUserOrder)
 		r.Get("/api/user/orders", h.GetUserOrders)
+		r.Get("/api/user/balance", h.GetUserBalance)
+		r.Post("/api/user/balance/withdraw", h.RequestUserWithdrawal)
 	})
 }
 

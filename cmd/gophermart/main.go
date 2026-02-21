@@ -10,9 +10,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/bissquit/gophermart/internal/accrual"
 	"github.com/bissquit/gophermart/internal/config"
 	"github.com/bissquit/gophermart/internal/repository/db"
 	"github.com/bissquit/gophermart/internal/server"
+	"github.com/bissquit/gophermart/internal/worker"
 	"github.com/bissquit/gophermart/migrations"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -50,6 +52,11 @@ func main() {
 			stop()
 		}
 	}()
+
+	accrualClient := accrual.NewClient(cfg.AccrualSystemAddr)
+
+	worker := worker.NewAccrualWorker(stg, accrualClient, logger)
+	go worker.Start(ctx)
 
 	<-ctx.Done()
 	logger.Info("shutting down")

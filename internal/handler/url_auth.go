@@ -121,10 +121,11 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]string{"token": token}); err != nil {
-		h.logger.Error("error encoding token", "error", err)
-		// do nothing, 'http.Error()' is useless because headers are already sent
-		return
-	}
+	//w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Authorization", "Bearer "+token)
+	//if err := json.NewEncoder(w).Encode(map[string]string{"token": token}); err != nil {
+	//	h.logger.Error("error encoding token", "error", err)
+	//	// do nothing, 'http.Error()' is useless because headers are already sent
+	//	return
+	//}
 }
