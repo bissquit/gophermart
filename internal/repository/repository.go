@@ -6,6 +6,8 @@ import (
 )
 
 var (
+	ErrRepositoryUnknownError = errors.New("unknown repository error")
+
 	// users
 	ErrUserAlreadyExists = errors.New("user already exists")
 	ErrUserNotFound      = errors.New("user not found")
@@ -26,7 +28,7 @@ type Order struct {
 	UserID      string
 	OrderNumber string
 	Status      string
-	Accrual     *int // *int may be nil
+	Accrual     *float64 // *int may be nil
 	UploadedAt  time.Time
 }
 
@@ -34,8 +36,8 @@ type Withdrawal struct {
 	ID          string
 	UserID      string
 	OrderNumber string
-	Sum         int
-	ProcessedAt *time.Time
+	Sum         float64
+	ProcessedAt time.Time
 }
 
 type GophermartRepository interface {
@@ -48,7 +50,7 @@ type GophermartRepository interface {
 	GetUserOrders(UserID string) (orders []Order, err error)
 
 	// balance
-	//GetUserBalance(userID string) (balance int, err error)
+	GetUserBalance(userID string) (current, withdrawn float64, err error)
 	//WithdrawUserBalance(userID string, amount int) (balance int, err error)
 	//GetUserWithdrawals(userID string)
 }

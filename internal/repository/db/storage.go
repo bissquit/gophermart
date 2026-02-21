@@ -146,3 +146,25 @@ func (s *PGStorage) GetUserOrders(UserID string) (orders []repository.Order, err
 
 	return orders, nil
 }
+
+func (s *PGStorage) GetUserBalance(userID string) (current, withdrawn float64, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	err = s.pool.QueryRow(ctx, `
+		SELECT
+			COALESCE((SELECT SUM(accrual) FROM orders WHERE user_id = $1 AND status = 'PROCESSED'), 0)
+			-
+			COALESCE((SELECT SUM(sum) FROM withdrawals WHERE user_id = $1), 0) as current,
+			
+			COALESCE((SELECT SUM(sum) FROM withdrawals WHERE user_id = $1), 0) as withdrawn
+		`,
+		userID,
+	).Scan(&current, &withdrawn)
+
+	if err != nil {
+		s.logger.Error("get user balance error", "err", err)
+		return 0, 0, err
+	}
+	return current, withdrawn, nil
+}
