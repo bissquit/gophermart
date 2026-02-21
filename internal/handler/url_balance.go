@@ -22,7 +22,7 @@ func (h *Handlers) GetUserBalance(w http.ResponseWriter, r *http.Request) {
 	current, withdrawn, err := h.storage.GetUserBalance(userID)
 	if err != nil {
 		h.logger.Error("error getting user balance", "error", err)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError) // 500
 		return
 	}
 	balance := userBalance{
@@ -52,12 +52,12 @@ func (h *Handlers) RequestUserWithdrawal(w http.ResponseWriter, r *http.Request)
 	var userWithdrawalItem *userWithdrawal
 	if err := json.NewDecoder(r.Body).Decode(&userWithdrawalItem); err != nil {
 		h.logger.Error("decode user withdrawal error", "err", err)
-		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest) // 400
 		return
 	}
 
 	if !luhn.Valid(userWithdrawalItem.OrderNumber) {
-		http.Error(w, http.StatusText(http.StatusUnprocessableEntity), http.StatusUnprocessableEntity)
+		http.Error(w, http.StatusText(http.StatusUnprocessableEntity), http.StatusUnprocessableEntity) // 422
 		return
 	}
 
@@ -67,15 +67,15 @@ func (h *Handlers) RequestUserWithdrawal(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if errors.Is(err, repository.ErrLowBalance) {
-		http.Error(w, http.StatusText(http.StatusPaymentRequired), http.StatusPaymentRequired)
+		http.Error(w, http.StatusText(http.StatusPaymentRequired), http.StatusPaymentRequired) // 402
 		return
 	}
 	if errors.Is(err, repository.ErrBalanceOrderAlreadyWithdrawn) {
-		http.Error(w, http.StatusText(http.StatusUnprocessableEntity), http.StatusUnprocessableEntity)
+		http.Error(w, http.StatusText(http.StatusUnprocessableEntity), http.StatusUnprocessableEntity) // 422
 		return
 	}
 	h.logger.Error("error requesting user withdrawal", "err", err)
-	http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+	http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError) // 500
 }
 
 type withdrawal struct {
@@ -90,7 +90,7 @@ func (h *Handlers) GetUserWithdrawals(w http.ResponseWriter, r *http.Request) {
 	withdrawals, err := h.storage.GetUserWithdrawals(userID)
 	if err != nil {
 		h.logger.Error("get user withdrawals error", "err", err)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError) // 500
 		return
 	}
 
@@ -99,7 +99,6 @@ func (h *Handlers) GetUserWithdrawals(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Преобразовать в формат для JSON
 	result := make([]withdrawal, 0, len(withdrawals))
 	for _, wdrl := range withdrawals {
 		result = append(result, withdrawal{

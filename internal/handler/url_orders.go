@@ -35,17 +35,17 @@ func (h *Handlers) CreateUserOrder(w http.ResponseWriter, r *http.Request) {
 
 	orderNumber := strings.TrimSpace(string(body))
 	if orderNumber == "" {
-		http.Error(w, "order number required", http.StatusBadRequest)
+		http.Error(w, "order number required", http.StatusBadRequest) // 400
 		return
 	}
 
 	if _, err := strconv.Atoi(orderNumber); err != nil {
-		http.Error(w, http.StatusText(http.StatusUnprocessableEntity), http.StatusUnprocessableEntity)
+		http.Error(w, http.StatusText(http.StatusUnprocessableEntity), http.StatusUnprocessableEntity) // 422
 		return
 	}
 
 	if !luhn.Valid(orderNumber) {
-		http.Error(w, http.StatusText(http.StatusUnprocessableEntity), http.StatusUnprocessableEntity)
+		http.Error(w, http.StatusText(http.StatusUnprocessableEntity), http.StatusUnprocessableEntity) // 422
 		return
 	}
 
@@ -53,22 +53,22 @@ func (h *Handlers) CreateUserOrder(w http.ResponseWriter, r *http.Request) {
 
 	err = h.storage.CreateUserOrder(userID, orderNumber)
 	if err == nil {
-		w.WriteHeader(http.StatusAccepted)
+		w.WriteHeader(http.StatusAccepted) // 202
 		return
 	}
 
 	if errors.Is(err, repository.ErrOrderAlreadyCreatedByUser) {
-		w.WriteHeader(http.StatusOK)
+		w.WriteHeader(http.StatusOK) // 200
 		return
 	}
 
 	if errors.Is(err, repository.ErrOrderAlreadyCreatedByAnotherUser) {
-		http.Error(w, http.StatusText(http.StatusConflict), http.StatusConflict)
+		http.Error(w, http.StatusText(http.StatusConflict), http.StatusConflict) // 409
 		return
 	}
 
 	h.logger.Error("create order error", "err", err)
-	http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+	http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError) // 500
 }
 
 type order struct {
@@ -85,7 +85,7 @@ func (h *Handlers) GetUserOrders(w http.ResponseWriter, r *http.Request) {
 	repoOrders, err := h.storage.GetUserOrders(userID)
 	if err != nil {
 		h.logger.Error("get orders by user error", "err", err)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError) // 500
 		return
 	}
 

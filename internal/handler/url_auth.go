@@ -1,3 +1,4 @@
+// Package handler provides HTTP request handlers for the Gophermart loyalty system.
 package handler
 
 import (
@@ -27,13 +28,13 @@ func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
 	var userItem *user
 	if err := json.NewDecoder(r.Body).Decode(&userItem); err != nil {
 		h.logger.Error("decode user error", "err", err)
-		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest) // 400
 		return
 	}
 
 	// fail fast
 	if userItem.Login == "" || userItem.Password == "" {
-		http.Error(w, "login and password required", http.StatusBadRequest)
+		http.Error(w, "login and password required", http.StatusBadRequest) // 400
 		return
 	}
 
@@ -41,7 +42,7 @@ func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
 	passwordHash, err := password.Hash(userItem.Password)
 	if err != nil {
 		h.logger.Error("error while hashing password", "error", err)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError) // 500
 		return
 	}
 
@@ -50,18 +51,18 @@ func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
 	userID, err = h.storage.CreateUser(userItem.Login, passwordHash)
 	if err != nil {
 		if errors.Is(err, repository.ErrUserAlreadyExists) {
-			http.Error(w, http.StatusText(http.StatusConflict), http.StatusConflict)
+			http.Error(w, http.StatusText(http.StatusConflict), http.StatusConflict) // 409
 			return
 		}
 		h.logger.Error("create user error", "err", err)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError) // 500
 		return
 	}
 
 	// generate token
 	token, err := jwt.GenerateToken(userID, userItem.Login, h.jwtSecret)
 	if err != nil {
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError) // 500
 		return
 	}
 
@@ -85,13 +86,13 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 	var userItem *user
 	if err := json.NewDecoder(r.Body).Decode(&userItem); err != nil {
 		h.logger.Error("decode user error", "err", err)
-		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest) // 400
 		return
 	}
 
 	// fail fast
 	if userItem.Login == "" || userItem.Password == "" {
-		http.Error(w, "login and password required", http.StatusBadRequest)
+		http.Error(w, "login and password required", http.StatusBadRequest) // 400
 		return
 	}
 
@@ -100,24 +101,24 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 	u, err := h.storage.GetUserByLogin(userItem.Login)
 	if err != nil {
 		if errors.Is(err, repository.ErrUserNotFound) {
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized) // 401
 			return
 		}
 		h.logger.Error("get user error", "err", err)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError) // 500
 		return
 	}
 
 	// check hash
 	if !password.CheckHash(userItem.Password, u.PasswordHash) {
-		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized) // 401
 		return
 	}
 
 	// generate token
 	token, err := jwt.GenerateToken(u.ID, u.Login, h.jwtSecret)
 	if err != nil {
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError) // 500
 		return
 	}
 

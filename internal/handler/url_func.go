@@ -25,7 +25,7 @@ func NewHandlers(storage repository.GophermartRepository, logger *slog.Logger, j
 
 func BadRequest(w http.ResponseWriter, message string) {
 	log.Printf("bad request: %s", message)
-	http.Error(w, message, http.StatusBadRequest)
+	http.Error(w, message, http.StatusBadRequest) // 400
 }
 
 func (h *Handlers) validateContentTypeJSON(w http.ResponseWriter, r *http.Request) bool {

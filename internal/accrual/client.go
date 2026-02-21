@@ -8,17 +8,21 @@ import (
 	"time"
 )
 
+// Client implements structure to store all required data to make cliant request
+// to remote loyalty service
 type Client struct {
 	baseURL string
 	client  *http.Client
 }
 
+// OrderResponse implements response structure of remote loyalty service
 type OrderResponse struct {
 	Order   string   `json:"order"`
 	Status  string   `json:"status"`
 	Accrual *float64 `json:"accrual,omitempty"`
 }
 
+// NewClient returns configured Client struct
 func NewClient(baseURL string) *Client {
 	return &Client{
 		baseURL: baseURL,
@@ -26,6 +30,7 @@ func NewClient(baseURL string) *Client {
 	}
 }
 
+// GetOrder implements client handler to request remote loyalty service
 func (c *Client) GetOrder(ctx context.Context, orderNumber string) (*OrderResponse, error) {
 	url := fmt.Sprintf("%s/api/orders/%s", c.baseURL, orderNumber)
 
