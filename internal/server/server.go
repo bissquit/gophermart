@@ -48,21 +48,21 @@ func (s *Server) setupRoutes() {
 	// middlewares
 	s.router.Use(logging.Logger(s.logger))
 
-	// public endpoints
+	// auth
 	s.router.Post("/api/user/register", h.Register)
 	s.router.Post("/api/user/login", h.Login)
+	// db health
 	s.router.Get("/ping", s.Ping)
 
 	s.router.Group(func(r chi.Router) {
 		r.Use(jwt.JWT(secret))
-		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "text/plain")
-			w.Write([]byte("It works!\n"))
-		})
+		// orders
 		r.Post("/api/user/orders", h.CreateUserOrder)
 		r.Get("/api/user/orders", h.GetUserOrders)
+		// balance
 		r.Get("/api/user/balance", h.GetUserBalance)
 		r.Post("/api/user/balance/withdraw", h.RequestUserWithdrawal)
+		r.Get("/api/user/withdrawals", h.GetUserWithdrawals)
 	})
 }
 
