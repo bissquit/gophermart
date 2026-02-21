@@ -168,3 +168,52 @@ func (s *PGStorage) GetUserBalance(userID string) (current, withdrawn float64, e
 	}
 	return current, withdrawn, nil
 }
+
+func (s *PGStorage) RequestUserWithdrawal(userID string, orderNumber string, sum float64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	// run transaction
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	// get current balance
+	var current float64
+	err = tx.QueryRow(ctx, `
+		SELECT
+			COALESCE((SELECT SUM(accrual) FROM orders WHERE user_id = $1 AND status = 'PROCESSED'), 0)
+			-
+			COALESCE((SELECT SUM(sum) FROM withdrawals WHERE user_id = $1), 0) as current
+		`,
+		userID,
+	).Scan(&current)
+
+	if err != nil {
+		s.logger.Error("get user balance error", "err", err)
+		return err
+	}
+
+	// check if withdrawal is possible
+	if current < sum {
+		return repository.ErrLowBalance
+	}
+
+	// trying to save withdrawal
+	_, err = tx.Exec(ctx,
+		"INSERT INTO withdrawals (user_id, order_number, sum) VALUES ($1, $2, $3)",
+		userID, orderNumber, sum,
+	)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
+			return repository.ErrBalanceOrderAlreadyWithdrawn
+		}
+		return err
+	}
+
+	// commit transaction
+	return tx.Commit(ctx)
+}

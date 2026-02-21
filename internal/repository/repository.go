@@ -15,6 +15,8 @@ var (
 	ErrOrderAlreadyCreatedByUser        = errors.New("order already created by user")
 	ErrOrderAlreadyCreatedByAnotherUser = errors.New("order already created by another user")
 	// balance
+	ErrLowBalance                   = errors.New("low balance")
+	ErrBalanceOrderAlreadyWithdrawn = errors.New("order already withdrawn")
 )
 
 type User struct {
@@ -32,13 +34,13 @@ type Order struct {
 	UploadedAt  time.Time
 }
 
-type Withdrawal struct {
-	ID          string
-	UserID      string
-	OrderNumber string
-	Sum         float64
-	ProcessedAt time.Time
-}
+//type Withdrawal struct {
+//	ID          string
+//	UserID      string
+//	OrderNumber string
+//	Sum         float64
+//	ProcessedAt time.Time
+//}
 
 type GophermartRepository interface {
 	// auth
@@ -51,6 +53,6 @@ type GophermartRepository interface {
 
 	// balance
 	GetUserBalance(userID string) (current, withdrawn float64, err error)
-	//WithdrawUserBalance(userID string, amount int) (balance int, err error)
+	RequestUserWithdrawal(userID string, orderNumber string, sum float64) error
 	//GetUserWithdrawals(userID string)
 }
