@@ -73,9 +73,6 @@ func (h *Handlers) RequestUserWithdrawal(w http.ResponseWriter, r *http.Request)
 		http.Error(w, http.StatusText(http.StatusUnprocessableEntity), http.StatusUnprocessableEntity)
 		return
 	}
-	if err != nil {
-		h.logger.Error("error requesting user withdrawal", "err", err)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
+	h.logger.Error("error requesting user withdrawal", "err", err)
+	http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 }
