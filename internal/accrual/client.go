@@ -44,11 +44,10 @@ func (c *Client) GetOrder(ctx context.Context, orderNumber string) (*OrderRespon
 		return nil, nil
 	}
 
-	//if resp.StatusCode == http.StatusTooManyRequests {
-	//	// Обработать Retry-After
-	//	retryAfter := resp.Header.Get("Retry-After")
-	//	return nil, fmt.Errorf("rate limit: retry after %s", retryAfter)
-	//}
+	if resp.StatusCode == http.StatusTooManyRequests {
+		retryAfter := resp.Header.Get("Retry-After")
+		return nil, fmt.Errorf("rate limit: retry after %s", retryAfter)
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status: %d", resp.StatusCode)
