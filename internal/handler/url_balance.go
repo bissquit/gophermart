@@ -62,18 +62,18 @@ func (h *Handlers) RequestUserWithdrawal(w http.ResponseWriter, r *http.Request)
 	}
 
 	err := h.storage.RequestUserWithdrawal(userID, userWithdrawalItem.OrderNumber, userWithdrawalItem.Sum)
-	if err == nil {
+	switch {
+	case err == nil:
 		w.WriteHeader(http.StatusOK)
 		return
-	}
-	if errors.Is(err, repository.ErrLowBalance) {
+	case errors.Is(err, repository.ErrLowBalance):
 		http.Error(w, http.StatusText(http.StatusPaymentRequired), http.StatusPaymentRequired) // 402
 		return
-	}
-	if errors.Is(err, repository.ErrBalanceOrderAlreadyWithdrawn) {
+	case errors.Is(err, repository.ErrBalanceOrderAlreadyWithdrawn):
 		http.Error(w, http.StatusText(http.StatusUnprocessableEntity), http.StatusUnprocessableEntity) // 422
 		return
 	}
+
 	h.logger.Error("error requesting user withdrawal", "err", err)
 	http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError) // 500
 }
