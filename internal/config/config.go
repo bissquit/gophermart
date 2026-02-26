@@ -5,12 +5,15 @@ import (
 	"os"
 )
 
+// Config structure stores required parameters to run server
 type Config struct {
 	ServerAddr        string
 	DSN               string
 	AccrualSystemAddr string
 }
 
+// GetDefaultConfig returns default Config structure with
+// preconfigured fields
 func GetDefaultConfig() *Config {
 	return &Config{
 		ServerAddr:        ":8080",
@@ -19,6 +22,7 @@ func GetDefaultConfig() *Config {
 	}
 }
 
+// GetConfig handles environment and cli options to return ready-to-run Config
 func GetConfig() *Config {
 	cfg := GetDefaultConfig()
 

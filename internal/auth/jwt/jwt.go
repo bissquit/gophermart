@@ -17,12 +17,15 @@ const (
 	LoginKey  contextKey = "login"
 )
 
+// Claims represents claim structure to store user_id and login
+// in addition to registered claims
 type Claims struct {
 	UserID string `json:"user_id"`
 	Login  string `json:"login"`
 	jwt.RegisteredClaims
 }
 
+// GenerateToken generates jwt token with Claim structure
 func GenerateToken(UserID, login string, secret []byte) (string, error) {
 	claims := Claims{
 		UserID: UserID,
@@ -37,6 +40,7 @@ func GenerateToken(UserID, login string, secret []byte) (string, error) {
 	return token.SignedString(secret)
 }
 
+// ParseToken parses token to return Claim structure
 func ParseToken(tokenString string, secret []byte) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -56,6 +60,8 @@ func ParseToken(tokenString string, secret []byte) (*Claims, error) {
 	return nil, fmt.Errorf("invalid token")
 }
 
+// JWT implements middleware to handle incoming request and pass them through
+// jwt authentication process
 func JWT(secret []byte) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
