@@ -40,8 +40,10 @@ func main() {
 	srv := server.NewServer(cfg, stg, pool, logger)
 
 	httpSrv := &http.Server{
-		Addr:    cfg.ServerAddr,
-		Handler: srv.Handler(),
+		Addr:         cfg.ServerAddr,
+		Handler:      srv.Handler(),
+		ReadTimeout:  time.Second * 5,
+		WriteTimeout: time.Second * 5,
 	}
 
 	logger.Info("server starting", "addr", cfg.ServerAddr)
