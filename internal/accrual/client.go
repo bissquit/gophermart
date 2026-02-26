@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"path"
 	"time"
 )
 
@@ -32,7 +33,7 @@ func NewClient(baseURL string) *Client {
 
 // GetOrder implements client handler to request remote loyalty service
 func (c *Client) GetOrder(ctx context.Context, orderNumber string) (*OrderResponse, error) {
-	url := fmt.Sprintf("%s/api/orders/%s", c.baseURL, orderNumber)
+	url := path.Join(c.baseURL, "/api/orders/", orderNumber)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
