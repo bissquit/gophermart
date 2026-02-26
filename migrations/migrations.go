@@ -2,6 +2,7 @@ package migrations
 
 import (
 	"embed"
+	"errors"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
@@ -34,7 +35,7 @@ func InitializeDB(databaseURL string) error {
 	// 4) Up() applies one by one all migration that haven't been applied yet
 	// if all migrations are already applied — return migrate.ErrNoChange (not an error)
 	err = m.Up()
-	if err == migrate.ErrNoChange {
+	if errors.Is(err, migrate.ErrNoChange) {
 		return nil
 	}
 	return err
