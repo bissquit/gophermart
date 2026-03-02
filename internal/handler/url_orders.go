@@ -1,0 +1,112 @@
+package handler
+
+import (
+	"encoding/json"
+	"errors"
+	"io"
+	"mime"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/bissquit/gophermart/internal/auth/jwt"
+	"github.com/bissquit/gophermart/internal/luhn"
+	"github.com/bissquit/gophermart/internal/repository"
+)
+
+func (h *Handlers) CreateUserOrder(w http.ResponseWriter, r *http.Request) {
+	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	defer r.Body.Close()
+	if err != nil {
+		BadRequest(w, "wrong Content-Type")
+		return
+	}
+	if mediaType != "text/plain" {
+		BadRequest(w, "Content-Type must be text/plain")
+		return
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		BadRequest(w, "Cannot read request body")
+		return
+	}
+
+	orderNumber := strings.TrimSpace(string(body))
+	if orderNumber == "" {
+		http.Error(w, "order number required", http.StatusBadRequest) // 400
+		return
+	}
+
+	if _, err := strconv.Atoi(orderNumber); err != nil {
+		http.Error(w, http.StatusText(http.StatusUnprocessableEntity), http.StatusUnprocessableEntity) // 422
+		return
+	}
+
+	if !luhn.Valid(orderNumber) {
+		http.Error(w, http.StatusText(http.StatusUnprocessableEntity), http.StatusUnprocessableEntity) // 422
+		return
+	}
+
+	userID := r.Context().Value(jwt.UserIDKey).(string)
+
+	err = h.storage.CreateUserOrder(userID, orderNumber)
+	if err == nil {
+		w.WriteHeader(http.StatusAccepted) // 202
+		return
+	}
+
+	if errors.Is(err, repository.ErrOrderAlreadyCreatedByUser) {
+		w.WriteHeader(http.StatusOK) // 200
+		return
+	}
+
+	if errors.Is(err, repository.ErrOrderAlreadyCreatedByAnotherUser) {
+		http.Error(w, http.StatusText(http.StatusConflict), http.StatusConflict) // 409
+		return
+	}
+
+	h.logger.Error("create order error", "err", err)
+	http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError) // 500
+}
+
+type order struct {
+	OrderNumber string    `json:"number"`
+	Status      string    `json:"status"`
+	Accrual     *float64  `json:"accrual,omitempty"`
+	UploadedAt  time.Time `json:"uploaded_at"`
+}
+
+func (h *Handlers) GetUserOrders(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(jwt.UserIDKey).(string)
+
+	var repoOrders []repository.Order
+	repoOrders, err := h.storage.GetUserOrders(userID)
+	if err != nil {
+		h.logger.Error("get orders by user error", "err", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError) // 500
+		return
+	}
+
+	if len(repoOrders) == 0 {
+		w.WriteHeader(http.StatusNoContent) // 204
+		return
+	}
+
+	userOrders := make([]order, 0, len(repoOrders))
+	for _, repoOrder := range repoOrders {
+		userOrder := order{
+			OrderNumber: repoOrder.OrderNumber,
+			Status:      repoOrder.Status,
+			Accrual:     repoOrder.Accrual,
+			UploadedAt:  repoOrder.UploadedAt,
+		}
+		userOrders = append(userOrders, userOrder)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(userOrders); err != nil {
+		h.logger.Error("error encoding orders", "err", err)
+	}
+}

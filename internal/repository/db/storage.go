@@ -1,0 +1,319 @@
+package db
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"time"
+
+	"github.com/bissquit/gophermart/internal/repository"
+	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+type PGStorage struct {
+	pool   *pgxpool.Pool
+	logger *slog.Logger
+}
+
+func NewDBStorage(p *pgxpool.Pool, l *slog.Logger) *PGStorage {
+	return &PGStorage{
+		pool:   p,
+		logger: l,
+	}
+}
+
+func (s *PGStorage) CreateUser(login, passwordHash string) (userID string, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	err = s.pool.QueryRow(ctx,
+		"INSERT INTO users (login, password_hash) VALUES ($1, $2) RETURNING id",
+		login, passwordHash,
+	).Scan(&userID)
+
+	if err == nil {
+		return userID, nil
+	}
+
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
+		return "", fmt.Errorf("%w: %s", repository.ErrUserAlreadyExists, login)
+	}
+
+	s.logger.Error("create user error", "err", err)
+	return "", err
+}
+
+func (s *PGStorage) GetUserByLogin(login string) (user repository.User, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	err = s.pool.QueryRow(ctx,
+		"SELECT id, login, password_hash FROM users WHERE login = $1",
+		login,
+	).Scan(&user.ID, &user.Login, &user.PasswordHash)
+
+	if err == nil {
+		return user, nil
+	}
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return repository.User{}, repository.ErrUserNotFound
+	}
+
+	s.logger.Error("get user by login error", "err", err, "login", login)
+	return repository.User{}, err
+}
+
+func (s *PGStorage) CreateUserOrder(userID, orderNumber string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	_, err := s.pool.Exec(ctx,
+		"INSERT INTO orders (user_id, order_number) VALUES ($1, $2)",
+		userID, orderNumber,
+	)
+
+	if err == nil {
+		return nil // 202
+	}
+
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
+		var existingUserID string
+		err = s.pool.QueryRow(ctx,
+			"SELECT user_id FROM orders WHERE order_number = $1",
+			orderNumber,
+		).Scan(&existingUserID)
+
+		if err != nil {
+			s.logger.Error("failed to check order owner", "err", err)
+			return err
+		}
+
+		if existingUserID == userID {
+			return repository.ErrOrderAlreadyCreatedByUser // 200
+		} else {
+			return repository.ErrOrderAlreadyCreatedByAnotherUser // 409
+		}
+	}
+
+	s.logger.Error("create order error", "err", err)
+	return err
+}
+
+func (s *PGStorage) GetUserOrders(UserID string) (orders []repository.Order, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	rows, err := s.pool.Query(ctx, `
+		SELECT id, user_id, order_number, status, accrual, uploaded_at 
+		FROM orders 
+		WHERE user_id = $1 
+		ORDER BY uploaded_at DESC
+	`, UserID)
+	if err != nil {
+		s.logger.Error("query orders error", "err", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var order repository.Order
+		err := rows.Scan(
+			&order.ID,
+			&order.UserID,
+			&order.OrderNumber,
+			&order.Status,
+			&order.Accrual,
+			&order.UploadedAt,
+		)
+		if err != nil {
+			s.logger.Error("scan order error", "err", err)
+			return nil, err
+		}
+		orders = append(orders, order)
+	}
+
+	if err := rows.Err(); err != nil {
+		s.logger.Error("rows iteration error", "err", err)
+		return nil, err
+	}
+
+	return orders, nil
+}
+
+func (s *PGStorage) GetUserBalance(userID string) (current, withdrawn float64, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	err = s.pool.QueryRow(ctx, `
+		SELECT
+			COALESCE((SELECT SUM(accrual) FROM orders WHERE user_id = $1 AND status = 'PROCESSED'), 0)
+			-
+			COALESCE((SELECT SUM(sum) FROM withdrawals WHERE user_id = $1), 0) as current,
+			
+			COALESCE((SELECT SUM(sum) FROM withdrawals WHERE user_id = $1), 0) as withdrawn
+		`,
+		userID,
+	).Scan(&current, &withdrawn)
+
+	if err != nil {
+		s.logger.Error("get user balance error", "err", err)
+		return 0, 0, err
+	}
+	return current, withdrawn, nil
+}
+
+func (s *PGStorage) RequestUserWithdrawal(userID string, orderNumber string, sum float64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	// run transaction
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	// get current balance
+	var current float64
+	err = tx.QueryRow(ctx, `
+		SELECT
+			COALESCE((SELECT SUM(accrual) FROM orders WHERE user_id = $1 AND status = 'PROCESSED'), 0)
+			-
+			COALESCE((SELECT SUM(sum) FROM withdrawals WHERE user_id = $1), 0) as current
+		`,
+		userID,
+	).Scan(&current)
+
+	if err != nil {
+		s.logger.Error("get user balance error", "err", err)
+		return err
+	}
+
+	// check if withdrawal is possible
+	if current < sum {
+		return repository.ErrLowBalance
+	}
+
+	// trying to save withdrawal
+	_, err = tx.Exec(ctx,
+		"INSERT INTO withdrawals (user_id, order_number, sum) VALUES ($1, $2, $3)",
+		userID, orderNumber, sum,
+	)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
+			return repository.ErrBalanceOrderAlreadyWithdrawn
+		}
+		return err
+	}
+
+	// commit transaction
+	return tx.Commit(ctx)
+}
+
+func (s *PGStorage) GetPendingOrders() ([]repository.Order, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	rows, err := s.pool.Query(ctx, `
+        SELECT id, user_id, order_number, status, accrual, uploaded_at 
+        FROM orders 
+        WHERE status IN ('NEW', 'PROCESSING', 'REGISTERED')
+        ORDER BY uploaded_at ASC
+    `)
+	if err != nil {
+		s.logger.Error("query pending orders error", "err", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var orders []repository.Order
+	for rows.Next() {
+		var order repository.Order
+		err := rows.Scan(
+			&order.ID,
+			&order.UserID,
+			&order.OrderNumber,
+			&order.Status,
+			&order.Accrual,
+			&order.UploadedAt,
+		)
+		if err != nil {
+			s.logger.Error("scan order error", "err", err)
+			return nil, err
+		}
+		orders = append(orders, order)
+	}
+
+	if err := rows.Err(); err != nil {
+		s.logger.Error("rows iteration error", "err", err)
+		return nil, err
+	}
+
+	return orders, nil
+}
+
+func (s *PGStorage) UpdateOrderStatus(orderNumber, status string, accrual *float64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	_, err := s.pool.Exec(ctx,
+		"UPDATE orders SET status = $1, accrual = $2 WHERE order_number = $3",
+		status, accrual, orderNumber,
+	)
+
+	if err != nil {
+		s.logger.Error("update order status error", "err", err, "order", orderNumber)
+		return err
+	}
+
+	return nil
+}
+
+func (s *PGStorage) GetUserWithdrawals(userID string) ([]repository.Withdrawal, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	rows, err := s.pool.Query(ctx, `
+        SELECT id, user_id, order_number, sum, processed_at 
+        FROM withdrawals 
+        WHERE user_id = $1 
+        ORDER BY processed_at DESC
+    `, userID)
+	if err != nil {
+		s.logger.Error("query withdrawals error", "err", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var withdrawals []repository.Withdrawal
+	for rows.Next() {
+		var w repository.Withdrawal
+		err := rows.Scan(
+			&w.ID,
+			&w.UserID,
+			&w.OrderNumber,
+			&w.Sum,
+			&w.ProcessedAt,
+		)
+		if err != nil {
+			s.logger.Error("scan withdrawal error", "err", err)
+			return nil, err
+		}
+		withdrawals = append(withdrawals, w)
+	}
+
+	if err := rows.Err(); err != nil {
+		s.logger.Error("rows iteration error", "err", err)
+		return nil, err
+	}
+
+	return withdrawals, nil
+}
