@@ -154,8 +154,7 @@ func Test_CreateUserOrder(t *testing.T) {
 				Level: slog.LevelInfo,
 			}))
 
-			var body io.Reader
-			body = strings.NewReader(tt.input.body)
+			body := strings.NewReader(tt.input.body)
 
 			r := httptest.NewRequest(http.MethodPost, "/api/user/orders", body)
 
