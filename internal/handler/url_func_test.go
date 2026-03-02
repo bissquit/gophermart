@@ -22,6 +22,9 @@ type fakeStorage struct {
 
 	// GetUserWithdrawals
 	withdrawals []repository.Withdrawal
+
+	// GetUserOrders
+	orders []repository.Order
 }
 
 func newFakeStorage() *fakeStorage { return &fakeStorage{} }
@@ -58,7 +61,10 @@ func (f *fakeStorage) GetUserOrders(UserID string) (orders []repository.Order, e
 	if f.getUserOrdersErr != nil {
 		return nil, f.getUserOrdersErr
 	}
-	return orders, nil
+	if f.orders != nil {
+		return f.orders, nil
+	}
+	return []repository.Order{}, nil
 }
 
 func (f *fakeStorage) GetUserBalance(userID string) (current, withdrawn float64, err error) {
